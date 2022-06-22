@@ -1,13 +1,10 @@
 #include "dpll.hpp"
 
-struct sudoku {
-  unsigned int region_size;
-  unsigned int size;
+template <std::size_t region_size> struct sudoku {
+  static constexpr unsigned int size = region_size * region_size;
   std::vector<std::vector<atom>> formula;
 
-  sudoku(unsigned int region_size = 3) {
-    this->region_size = region_size;
-    size = region_size * region_size;
+  sudoku() {
     formula.clear();
 
     // Valid numbers
@@ -54,13 +51,17 @@ struct sudoku {
     }
 
     for (const auto &i : regions) {
-      std::vector<std::pair<unsigned int, unsigned int>> region;
-
       for (const auto &j : regions) {
-        region.push_back(std::pair(i, j));
-      }
+        std::vector<std::pair<unsigned int, unsigned int>> region;
 
-      valid(region);
+        for (int add_i = 0; add_i < region_size; add_i++) {
+          for (int add_j = 0; add_j < region_size; add_j++) {
+            region.push_back(std::pair(i + add_i, j + add_j));
+          }
+        }
+
+        valid(region);
+      }
     }
   }
 
@@ -97,6 +98,18 @@ struct sudoku {
           unsigned int cell2 = cell(seq[j].first, seq[j].second, d);
 
           formula.push_back({atom(cell1, false), atom(cell2, false)});
+        }
+      }
+    }
+  }
+
+  void read_grid(const std::vector<std::vector<unsigned int>> &grid) {
+    for (size_t i = 0; i < size; i++) {
+      for (size_t j = 0; j < size; j++) {
+        int d = grid[i][j];
+
+        if (d > 0) {
+          formula.push_back({{cell(i + 1, j + 1, d), true}});
         }
       }
     }
