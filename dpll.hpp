@@ -10,7 +10,7 @@ struct atom {
 
   unsigned int lit() const { return abs(v); }
 
-  constexpr int value() const { return std::clamp(v, -1, 1); }
+  constexpr int value() const { return (v > 0) - (v < 0); }
 };
 
 struct sat {
