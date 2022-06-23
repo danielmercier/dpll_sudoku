@@ -75,54 +75,52 @@ bool sat::bcp(const std::pair<unsigned int, int> &var) {
   std::queue<std::pair<unsigned int, int>> implied;
   implied.push(var);
 
-  bool o = true;
-
   while (!implied.empty()) {
     const auto &atom = implied.front();
     unsigned int lit = atom.first;
     int value = atom.second;
     implied.pop();
 
-    for (const auto &entry : lit_occurences[lit]) {
+    /*for (const auto &entry : lit_occurences[lit]) {
       // First check if the clause is true
       if (entry.second * value > 0) {
         goto next_clause;
       } else {
-        const auto &clause = formula[entry.first];
-        // Check all other literals in the clause
-        for (auto it = std::begin(clause); it != std::end(clause); ++it) {
-          unsigned int lit = it->lit();
-          int value = it->value();
-          int i = model[lit];
-          int result = value * i;
+        const auto &clause = formula[entry.first];*/
+    for (const auto &clause : formula) {
+      // Check all other literals in the clause
+      for (auto it = std::begin(clause); it != std::end(clause); ++it) {
+        unsigned int lit = it->lit();
+        int value = it->value();
+        int i = model[lit];
+        int result = value * i;
 
-          if (result > 0) {
-            // Clause is true, continue
-            goto next_clause;
-          } else if (result == 0) {
-            // Clause is uninterpreted, find if it is a unit clause
-            for (auto inner_it = it + 1; inner_it != std::end(clause);
-                 ++inner_it) {
-              int i = model[inner_it->lit()];
-              int result = inner_it->value() * i;
+        if (result > 0) {
+          // Clause is true, continue
+          goto next_clause;
+        } else if (result == 0) {
+          // Clause is uninterpreted, find if it is a unit clause
+          for (auto inner_it = it + 1; inner_it != std::end(clause);
+               ++inner_it) {
+            int i = model[inner_it->lit()];
+            int result = inner_it->value() * i;
 
-              if (result > 0) {
-                // Clause is true, continue
-                goto next_clause;
-              } else if (result == 0) {
-                // Second uninterpreted. Stop
-                goto next_clause;
-              }
+            if (result > 0) {
+              // Clause is true, continue
+              goto next_clause;
+            } else if (result == 0) {
+              // Second uninterpreted. Stop
+              goto next_clause;
             }
-
-            // This is a unit clause
-            model[lit] = value;
-            assignment_level[lit] = decision_stack.size();
-
-            implied.push(std::pair(lit, value));
-
-            goto next_clause;
           }
+
+          // This is a unit clause
+          model[lit] = value;
+          assignment_level[lit] = decision_stack.size();
+
+          implied.push(std::pair(lit, value));
+
+          goto next_clause;
         }
       }
 
