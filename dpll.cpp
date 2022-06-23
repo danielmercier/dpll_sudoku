@@ -75,18 +75,11 @@ bool sat::bcp(const std::pair<unsigned int, int> &var) {
   std::queue<std::pair<unsigned int, int>> implied;
   implied.push(var);
 
-  while (!implied.empty()) {
-    const auto &atom = implied.front();
-    unsigned int lit = atom.first;
-    int value = atom.second;
-    implied.pop();
+  bool found_unit_clause = true;
 
-    /*for (const auto &entry : lit_occurences[lit]) {
-      // First check if the clause is true
-      if (entry.second * value > 0) {
-        goto next_clause;
-      } else {
-        const auto &clause = formula[entry.first];*/
+  while (found_unit_clause) {
+    found_unit_clause = false;
+
     for (const auto &clause : formula) {
       // Check all other literals in the clause
       for (auto it = std::begin(clause); it != std::end(clause); ++it) {
@@ -115,6 +108,7 @@ bool sat::bcp(const std::pair<unsigned int, int> &var) {
           }
 
           // This is a unit clause
+          found_unit_clause = true;
           model[lit] = value;
           assignment_level[lit] = decision_stack.size();
 
