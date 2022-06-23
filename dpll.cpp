@@ -1,4 +1,13 @@
 #include "dpll.hpp"
+#include <queue>
+
+constexpr int operator*(int l, const atom &r) { return l * r.v; }
+
+constexpr int operator*(const atom &l, int r) { return l.v * r; }
+
+constexpr int operator*(const atom &l, const atom &r) {
+  return l.v * r.value();
+}
 
 sat::sat(std::vector<std::vector<atom>> &formula) {
   this->formula = formula;
@@ -15,6 +24,14 @@ sat::sat(std::vector<std::vector<atom>> &formula) {
   size_t size = last_lit + 1;
   model.resize(size, 0);
   assignment_level.resize(size, 0);
+
+  lit_occurences.resize(size, std::unordered_map<size_t, int>());
+
+  for (size_t clause = 0; clause < formula.size(); clause++) {
+    for (const auto &atom : formula[clause]) {
+      lit_occurences[atom.lit()][clause] = atom.value();
+    }
+  }
 }
 
 bool sat::is_valid() {
@@ -34,70 +51,93 @@ bool sat::is_valid() {
   return true;
 }
 
-bool sat::decide() {
+std::optional<std::pair<unsigned int, int>> sat::decide() {
   for (const auto &clause : formula) {
     for (const auto &atom : clause) {
       unsigned int lit = atom.lit();
       if (model[lit] == 0) {
-        model[lit] = atom.value();
+        int value = atom.value();
+        model[lit] = value;
         decision_stack.push_back(lit);
 
-        return true;
-      } else if (model[lit] * atom.value() > 0) {
+        return std::pair(lit, value);
+      } else if (model[lit] * atom > 0) {
         // True clause, do not continue
         break;
       }
     }
   }
 
-  return false;
+  return std::nullopt;
 }
 
-bool sat::bcp() {
-  for (const auto &clause : formula) {
-    for (auto it = std::begin(clause); it != std::end(clause); ++it) {
-      unsigned int lit = it->lit();
-      int value = it->value();
-      int i = model[lit];
-      int result = value * i;
+bool sat::bcp(const std::pair<unsigned int, int> &var) {
+  std::queue<std::pair<unsigned int, int>> implied;
+  implied.push(var);
 
-      if (result > 0) {
-        // Clause is true, continue
+  bool o = true;
+
+  while (!implied.empty()) {
+    const auto &atom = implied.front();
+    unsigned int lit = atom.first;
+    int value = atom.second;
+    implied.pop();
+
+    for (const auto &entry : lit_occurences[lit]) {
+      // First check if the clause is true
+      if (entry.second * value > 0) {
         goto next_clause;
-      } else if (result == 0) {
-        // Clause is uninterpreted, find if it is a unit clause
-        for (auto inner_it = it + 1; inner_it != std::end(clause); ++inner_it) {
-          int i = model[inner_it->lit()];
-          int result = inner_it->value() * i;
+      } else {
+        const auto &clause = formula[entry.first];
+        // Check all other literals in the clause
+        for (auto it = std::begin(clause); it != std::end(clause); ++it) {
+          unsigned int lit = it->lit();
+          int value = it->value();
+          int i = model[lit];
+          int result = value * i;
 
           if (result > 0) {
             // Clause is true, continue
             goto next_clause;
           } else if (result == 0) {
-            // Second uninterpreted. Stop
+            // Clause is uninterpreted, find if it is a unit clause
+            for (auto inner_it = it + 1; inner_it != std::end(clause);
+                 ++inner_it) {
+              int i = model[inner_it->lit()];
+              int result = inner_it->value() * i;
+
+              if (result > 0) {
+                // Clause is true, continue
+                goto next_clause;
+              } else if (result == 0) {
+                // Second uninterpreted. Stop
+                goto next_clause;
+              }
+            }
+
+            // This is a unit clause
+            model[lit] = value;
+            assignment_level[lit] = decision_stack.size();
+
+            implied.push(std::pair(lit, value));
+
             goto next_clause;
           }
         }
-
-        // This is a unit clause
-        model[lit] = value;
-        assignment_level[lit] = decision_stack.size();
-
-        goto next_clause;
       }
+
+      return false;
+
+    next_clause : {}
     }
-
-    return false;
-
-  next_clause : {}
   }
 
   return true;
 }
 
-bool sat::resolve_conflict() {
+std::optional<std::pair<unsigned int, int>> sat::resolve_conflict() {
   if (decision_stack.empty()) {
-    return false;
+    return std::nullopt;
   }
 
   unsigned int lit = decision_stack.back();
@@ -113,22 +153,28 @@ bool sat::resolve_conflict() {
   }
 
   // Flip the value and add the decision level
-  model[lit] = -1 * model[lit];
+  int value = -1 * model[lit];
+
+  model[lit] = value;
   assignment_level[lit] = decision_stack.size();
 
-  return true;
+  return std::pair(lit, value);
 }
 
 bool sat::dpll() {
   while (true) {
-    while (!bcp()) {
-      if (!resolve_conflict()) {
-        return false;
-      }
+    auto implied = decide();
+
+    if (!implied.has_value()) {
+      return true;
     }
 
-    if (!decide()) {
-      return true;
+    while (!bcp(implied.value())) {
+      implied = resolve_conflict();
+
+      if (!implied.has_value()) {
+        return false;
+      }
     }
   }
 }
