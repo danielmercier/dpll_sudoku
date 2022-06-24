@@ -1,7 +1,8 @@
+#include "dimacs.hpp"
 #include "sudoku.hpp"
 #include <iostream>
 
-int main() {
+int main(int argc, char **argv) {
   sudoku<3> sudoku;
 
   // for (const auto &clause : sudoku.formula) {
@@ -34,15 +35,15 @@ int main() {
       {0, 0, 0, 0, 0, 9, 7, 0, 0}};
 
   sudoku.read_grid(grid);
-  sat sat(sudoku.formula);
+  sat sudoku_sat(sudoku.formula);
 
-  std::cout << "Sudoku can be solved: " << sat.dpll() << std::endl;
+  std::cout << "Sudoku can be solved: " << sudoku_sat.dpll() << std::endl;
 
   for (unsigned int i = 1; i <= sudoku.size; i++) {
     for (unsigned int j = 1; j <= sudoku.size; j++) {
       std::optional<unsigned int> val;
       for (unsigned int d = 1; d <= sudoku.size; d++) {
-        if (sat.model[sudoku.cell(i, j, d)] > 0) {
+        if (sudoku_sat.model[sudoku.cell(i, j, d)] > 0) {
           if (val.has_value()) {
             std::cout << "ERROR, two different digits" << std::endl;
             return 1;
@@ -61,6 +62,14 @@ int main() {
     }
 
     std::cout << std::endl;
+  }
+
+  for (size_t i = 1; i < argc; i++) {
+    auto formula = read_file(argv[i]);
+
+    sat sat(formula);
+
+    std::cout << argv[i] << " is SAT: " << sat.dpll() << std::endl;
   }
 
   return 0;
