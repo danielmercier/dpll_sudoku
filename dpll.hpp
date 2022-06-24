@@ -1,3 +1,5 @@
+#pragma once
+
 #include <algorithm>
 #include <optional>
 #include <unordered_map>
@@ -7,6 +9,7 @@ struct atom {
   int v; // SHOULD NOT BE 0
 
   atom(unsigned int lit, bool value) { v = value ? lit : -lit; }
+  atom(int v) { this->v = v; }
 
   unsigned int lit() const { return abs(v); }
 
