@@ -72,9 +72,6 @@ std::optional<std::pair<unsigned int, int>> sat::decide() {
 }
 
 bool sat::bcp(const std::pair<unsigned int, int> &variable) {
-  std::queue<std::pair<unsigned int, int>> implied;
-  implied.push(variable);
-
   bool found_unit_clause = true;
 
   while (found_unit_clause) {
@@ -110,8 +107,6 @@ bool sat::bcp(const std::pair<unsigned int, int> &variable) {
           found_unit_clause = true;
           model[variable] = polarity;
           assignment_level[variable] = decision_stack.size();
-
-          implied.push(std::pair(variable, polarity));
 
           goto next_clause;
         }
