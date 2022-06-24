@@ -1,44 +1,44 @@
 #include "dpll.hpp"
 #include <queue>
 
-constexpr int operator*(int l, const atom &r) { return l * r.v; }
+constexpr int operator*(int l, const literal &r) { return l * r.v; }
 
-constexpr int operator*(const atom &l, int r) { return l.v * r; }
+constexpr int operator*(const literal &l, int r) { return l.v * r; }
 
-constexpr int operator*(const atom &l, const atom &r) {
-  return l.v * r.value();
+constexpr int operator*(const literal &l, const literal &r) {
+  return l.v * r.polarity();
 }
 
-sat::sat(std::vector<std::vector<atom>> &formula) {
+sat::sat(std::vector<std::vector<literal>> &formula) {
   this->formula = formula;
 
-  unsigned int last_lit = 0;
+  unsigned int last_var = 0;
 
   for (const auto &clause : formula) {
-    for (const auto &atom : clause) {
-      unsigned int lit = atom.lit();
-      last_lit = std::max(last_lit, lit);
+    for (const auto &literal : clause) {
+      unsigned int var = literal.variable();
+      last_var = std::max(last_var, var);
     }
   }
 
-  size_t size = last_lit + 1;
+  size_t size = last_var + 1;
   model.resize(size, 0);
   assignment_level.resize(size, 0);
 
-  lit_occurences.resize(size, std::unordered_map<size_t, int>());
+  var_occurences.resize(size, std::unordered_map<size_t, int>());
 
   for (size_t clause = 0; clause < formula.size(); clause++) {
-    for (const auto &atom : formula[clause]) {
-      lit_occurences[atom.lit()][clause] = atom.value();
+    for (const auto &literal : formula[clause]) {
+      var_occurences[literal.variable()][clause] = literal.polarity();
     }
   }
 }
 
 bool sat::is_valid() {
   for (const auto &clause : formula) {
-    for (const auto &atom : clause) {
-      unsigned int lit = atom.lit();
-      if (atom.value() * model[lit] > 0) {
+    for (const auto &literal : clause) {
+      unsigned int variable = literal.variable();
+      if (literal.polarity() * model[variable] > 0) {
         goto next_clause;
       }
     }
@@ -53,15 +53,15 @@ bool sat::is_valid() {
 
 std::optional<std::pair<unsigned int, int>> sat::decide() {
   for (const auto &clause : formula) {
-    for (const auto &atom : clause) {
-      unsigned int lit = atom.lit();
-      if (model[lit] == 0) {
-        int value = atom.value();
-        model[lit] = value;
-        decision_stack.push_back(lit);
+    for (const auto &literal : clause) {
+      unsigned int variable = literal.variable();
+      if (model[variable] == 0) {
+        int polarity = literal.polarity();
+        model[variable] = polarity;
+        decision_stack.push_back(variable);
 
-        return std::pair(lit, value);
-      } else if (model[lit] * atom > 0) {
+        return std::pair(variable, polarity);
+      } else if (model[variable] * literal > 0) {
         // True clause, do not continue
         break;
       }
@@ -71,9 +71,9 @@ std::optional<std::pair<unsigned int, int>> sat::decide() {
   return std::nullopt;
 }
 
-bool sat::bcp(const std::pair<unsigned int, int> &var) {
+bool sat::bcp(const std::pair<unsigned int, int> &variable) {
   std::queue<std::pair<unsigned int, int>> implied;
-  implied.push(var);
+  implied.push(variable);
 
   bool found_unit_clause = true;
 
@@ -81,12 +81,11 @@ bool sat::bcp(const std::pair<unsigned int, int> &var) {
     found_unit_clause = false;
 
     for (const auto &clause : formula) {
-      // Check all other literals in the clause
       for (auto it = std::begin(clause); it != std::end(clause); ++it) {
-        unsigned int lit = it->lit();
-        int value = it->value();
-        int i = model[lit];
-        int result = value * i;
+        unsigned int variable = it->variable();
+        int polarity = it->polarity();
+        int i = model[variable];
+        int result = polarity * i;
 
         if (result > 0) {
           // Clause is true, continue
@@ -95,8 +94,8 @@ bool sat::bcp(const std::pair<unsigned int, int> &var) {
           // Clause is uninterpreted, find if it is a unit clause
           for (auto inner_it = it + 1; inner_it != std::end(clause);
                ++inner_it) {
-            int i = model[inner_it->lit()];
-            int result = inner_it->value() * i;
+            int i = model[inner_it->variable()];
+            int result = inner_it->polarity() * i;
 
             if (result > 0) {
               // Clause is true, continue
@@ -109,10 +108,10 @@ bool sat::bcp(const std::pair<unsigned int, int> &var) {
 
           // This is a unit clause
           found_unit_clause = true;
-          model[lit] = value;
-          assignment_level[lit] = decision_stack.size();
+          model[variable] = polarity;
+          assignment_level[variable] = decision_stack.size();
 
-          implied.push(std::pair(lit, value));
+          implied.push(std::pair(variable, polarity));
 
           goto next_clause;
         }
@@ -132,25 +131,26 @@ std::optional<std::pair<unsigned int, int>> sat::resolve_conflict() {
     return std::nullopt;
   }
 
-  unsigned int lit = decision_stack.back();
+  unsigned int variable = decision_stack.back();
   unsigned int decision_level = decision_stack.size();
   decision_stack.pop_back();
 
   // Remove any invalidated assignments
-  for (unsigned int lit = 1; lit < assignment_level.size(); lit++) {
-    if (assignment_level[lit] >= decision_level) {
-      model[lit] = 0;
-      assignment_level[lit] = 0;
+  for (unsigned int variable = 1; variable < assignment_level.size();
+       variable++) {
+    if (assignment_level[variable] >= decision_level) {
+      model[variable] = 0;
+      assignment_level[variable] = 0;
     }
   }
 
-  // Flip the value and add the decision level
-  int value = -1 * model[lit];
+  // Flip the polarity and add the decision level
+  int polarity = -1 * model[variable];
 
-  model[lit] = value;
-  assignment_level[lit] = decision_stack.size();
+  model[variable] = polarity;
+  assignment_level[variable] = decision_stack.size();
 
-  return std::pair(lit, value);
+  return std::pair(variable, polarity);
 }
 
 bool sat::dpll() {

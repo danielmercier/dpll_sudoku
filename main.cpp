@@ -3,7 +3,7 @@
 #include <iostream>
 
 int main(int argc, char **argv) {
-  sudoku<3> sudoku;
+  /*sudoku<3> sudoku;
 
   // for (const auto &clause : sudoku.formula) {
   //  std::cout << "&& ";
@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
     }
 
     std::cout << std::endl;
-  }
+  }*/
 
   for (size_t i = 1; i < argc; i++) {
     auto formula = read_file(argv[i]);

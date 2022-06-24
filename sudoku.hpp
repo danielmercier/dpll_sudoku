@@ -2,7 +2,7 @@
 
 template <std::size_t region_size> struct sudoku {
   static constexpr unsigned int size = region_size * region_size;
-  std::vector<std::vector<atom>> formula;
+  std::vector<std::vector<literal>> formula;
 
   sudoku() {
     formula.clear();
@@ -70,10 +70,10 @@ template <std::size_t region_size> struct sudoku {
   }
 
   void one_of_nine(unsigned int i, unsigned int j) {
-    std::vector<atom> clause;
+    std::vector<literal> clause;
 
     for (unsigned int d = 1; d <= size; d++) {
-      clause.push_back(atom(cell(i, j, d), true));
+      clause.push_back(literal(cell(i, j, d), true));
     }
 
     formula.push_back(clause);
@@ -85,7 +85,7 @@ template <std::size_t region_size> struct sudoku {
         unsigned int cell1 = cell(i, j, d1);
         unsigned int cell2 = cell(i, j, d2);
 
-        formula.push_back({atom(cell1, false), atom(cell2, false)});
+        formula.push_back({literal(cell1, false), literal(cell2, false)});
       }
     }
   }
@@ -97,7 +97,7 @@ template <std::size_t region_size> struct sudoku {
           unsigned int cell1 = cell(seq[i].first, seq[i].second, d);
           unsigned int cell2 = cell(seq[j].first, seq[j].second, d);
 
-          formula.push_back({atom(cell1, false), atom(cell2, false)});
+          formula.push_back({literal(cell1, false), literal(cell2, false)});
         }
       }
     }

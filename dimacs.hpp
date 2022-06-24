@@ -5,8 +5,8 @@
 #include <iostream>
 #include <vector>
 
-std::vector<std::vector<atom>> read_file(const std::string &filename) {
-  std::vector<std::vector<atom>> result;
+std::vector<std::vector<literal>> read_file(const std::string &filename) {
+  std::vector<std::vector<literal>> result;
   std::ifstream is(filename);
 
   if (is) {
@@ -23,12 +23,12 @@ std::vector<std::vector<atom>> read_file(const std::string &filename) {
       } else {
         is.unget();
         int a;
-        std::vector<atom> clause;
+        std::vector<literal> clause;
 
         is >> a;
 
         while (a != 0 && !is.eof()) {
-          clause.push_back(atom(a));
+          clause.push_back(literal(a));
           is >> a;
         }
 
