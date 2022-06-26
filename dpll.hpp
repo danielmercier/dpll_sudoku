@@ -26,6 +26,7 @@ struct sat {
   std::vector<int> model; // -1 is false, 0 is unkown, 1 is true
   std::vector<unsigned int> decision_stack;
   std::vector<unsigned int> assignment_level;
+  std::vector<std::vector<unsigned int>> implication_graph;
 
   // Misceleneous
   std::optional<std::vector<literal>> conflicting_clause;

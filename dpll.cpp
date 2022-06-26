@@ -1,4 +1,5 @@
 #include "dpll.hpp"
+#include <iostream>
 #include <queue>
 
 constexpr int operator*(int l, const literal &r) { return l * r.v; }
@@ -24,6 +25,7 @@ sat::sat(std::vector<std::vector<literal>> &formula) {
   size_t size = last_var + 1;
   model.resize(size, 0);
   assignment_level.resize(size, 0);
+  implication_graph.resize(size);
 
   var_occurences.resize(size, std::unordered_map<size_t, int>());
 
@@ -78,7 +80,7 @@ bool sat::bcp(const std::pair<unsigned int, int> &variable) {
     found_unit_clause = false;
 
     for (const auto &clause : formula) {
-      for (auto it = std::begin(clause); it != std::end(clause); ++it) {
+      for (auto it = clause.begin(); it != clause.end(); ++it) {
         unsigned int variable = it->variable();
         int polarity = it->polarity();
         int i = model[variable];
@@ -89,16 +91,12 @@ bool sat::bcp(const std::pair<unsigned int, int> &variable) {
           goto next_clause;
         } else if (result == 0) {
           // Clause is uninterpreted, find if it is a unit clause
-          for (auto inner_it = it + 1; inner_it != std::end(clause);
-               ++inner_it) {
-            int i = model[inner_it->variable()];
-            int result = inner_it->polarity() * i;
+          for (++it; it != clause.end(); ++it) {
+            int i = model[it->variable()];
+            int result = it->polarity() * i;
 
-            if (result > 0) {
-              // Clause is true, continue
-              goto next_clause;
-            } else if (result == 0) {
-              // Second uninterpreted. Stop
+            if (result >= 0) {
+              // Clause is true or second uninterpreted
               goto next_clause;
             }
           }
@@ -108,8 +106,23 @@ bool sat::bcp(const std::pair<unsigned int, int> &variable) {
           model[variable] = polarity;
           assignment_level[variable] = decision_stack.size();
 
+          implication_graph[variable].reserve(clause.size() - 1);
+
+          for (const auto &literal : clause) {
+            unsigned int clause_variable = literal.variable();
+
+            if (clause_variable != variable) {
+              implication_graph[variable].push_back(clause_variable);
+            }
+          }
+
           goto next_clause;
         }
+      }
+
+      // Register the conflicting clause @0
+      for (const auto &literal : clause) {
+        implication_graph[0].push_back(literal.variable());
       }
 
       return false;
@@ -126,9 +139,39 @@ std::optional<std::pair<unsigned int, int>> sat::resolve_conflict() {
     return std::nullopt;
   }
 
+  std::vector<literal> new_clause;
+
+  unsigned int bt_level = 0;
+  std::queue<unsigned int> q;
+
+  for (const auto &pred : implication_graph[0]) {
+    q.push(pred);
+  }
+
+  while (!q.empty()) {
+    unsigned int variable = q.front();
+    q.pop();
+
+    if (implication_graph[variable].empty() ||
+        assignment_level[variable] < decision_stack.size()) {
+      bt_level = std::max(bt_level, assignment_level[variable]);
+      new_clause.push_back(literal(variable * -model[variable]));
+    }
+
+    for (const auto &pred : implication_graph[variable]) {
+      q.push(pred);
+    }
+  }
+
+  formula.push_back(new_clause);
+
+  // decision_stack.resize(bt_level + 1);
+
   unsigned int variable = decision_stack.back();
   unsigned int decision_level = decision_stack.size();
   decision_stack.pop_back();
+
+  implication_graph[0].clear();
 
   // Remove any invalidated assignments
   for (unsigned int variable = 1; variable < assignment_level.size();
@@ -136,6 +179,7 @@ std::optional<std::pair<unsigned int, int>> sat::resolve_conflict() {
     if (assignment_level[variable] >= decision_level) {
       model[variable] = 0;
       assignment_level[variable] = 0;
+      implication_graph[variable].clear();
     }
   }
 
@@ -144,6 +188,7 @@ std::optional<std::pair<unsigned int, int>> sat::resolve_conflict() {
 
   model[variable] = polarity;
   assignment_level[variable] = decision_stack.size();
+  implication_graph[variable].push_back(decision_stack.back());
 
   return std::pair(variable, polarity);
 }
