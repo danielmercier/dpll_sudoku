@@ -1,6 +1,8 @@
 #include "dpll.hpp"
+#include "debug.hpp"
 #include <iostream>
 #include <queue>
+#include <unordered_set>
 
 constexpr int operator*(int l, const literal &r) { return l * r.v; }
 
@@ -36,24 +38,7 @@ sat::sat(std::vector<std::vector<literal>> &formula) {
   }
 }
 
-bool sat::is_valid() {
-  for (const auto &clause : formula) {
-    for (const auto &literal : clause) {
-      unsigned int variable = literal.variable();
-      if (literal.polarity() * model[variable] > 0) {
-        goto next_clause;
-      }
-    }
-
-    return false;
-
-  next_clause : {}
-  }
-
-  return true;
-}
-
-std::optional<std::pair<unsigned int, int>> sat::decide() {
+bool sat::decide() {
   for (const auto &clause : formula) {
     for (const auto &literal : clause) {
       unsigned int variable = literal.variable();
@@ -63,7 +48,7 @@ std::optional<std::pair<unsigned int, int>> sat::decide() {
         decision_stack.push_back(variable);
         assignment_level[variable] = decision_stack.size();
 
-        return std::pair(variable, polarity);
+        return true;
       } else if (model[variable] * literal > 0) {
         // True clause, do not continue
         break;
@@ -71,10 +56,10 @@ std::optional<std::pair<unsigned int, int>> sat::decide() {
     }
   }
 
-  return std::nullopt;
+  return false;
 }
 
-bool sat::bcp(const std::pair<unsigned int, int> &variable) {
+bool sat::bcp() {
   bool found_unit_clause = true;
 
   while (found_unit_clause) {
@@ -135,11 +120,12 @@ bool sat::bcp(const std::pair<unsigned int, int> &variable) {
   return true;
 }
 
-std::optional<std::pair<unsigned int, int>> sat::resolve_conflict() {
+bool sat::resolve_conflict() {
   if (decision_stack.empty()) {
-    return std::nullopt;
+    return false;
   }
 
+  std::unordered_set<unsigned int> already_seen;
   std::vector<literal> new_clause;
 
   unsigned int bt_level = 0;
@@ -153,14 +139,18 @@ std::optional<std::pair<unsigned int, int>> sat::resolve_conflict() {
     unsigned int variable = q.front();
     q.pop();
 
-    if (implication_graph[variable].empty() ||
-        assignment_level[variable] < decision_stack.size()) {
-      bt_level = std::max(bt_level, assignment_level[variable]);
-      new_clause.push_back(literal(variable * -model[variable]));
-    }
+    if (already_seen.find(variable) == already_seen.end()) {
+      if (implication_graph[variable].empty() ||
+          assignment_level[variable] < decision_stack.size()) {
+        bt_level = std::max(bt_level, assignment_level[variable]);
+        new_clause.push_back(literal(variable * -model[variable]));
+      }
 
-    for (const auto &pred : implication_graph[variable]) {
-      q.push(pred);
+      for (const auto &pred : implication_graph[variable]) {
+        q.push(pred);
+      }
+
+      already_seen.insert(variable);
     }
   }
 
@@ -190,21 +180,17 @@ std::optional<std::pair<unsigned int, int>> sat::resolve_conflict() {
   assignment_level[variable] = decision_stack.size();
   implication_graph[variable].push_back(decision_stack.back());
 
-  return std::pair(variable, polarity);
+  return true;
 }
 
 bool sat::dpll() {
   while (true) {
-    auto implied = decide();
-
-    if (!implied.has_value()) {
+    if (!decide()) {
       return true;
     }
 
-    while (!bcp(implied.value())) {
-      implied = resolve_conflict();
-
-      if (!implied.has_value()) {
+    while (!bcp()) {
+      if (!resolve_conflict()) {
         return false;
       }
     }

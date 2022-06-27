@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <iostream>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -14,6 +15,11 @@ struct literal {
   unsigned int variable() const { return abs(v); }
 
   constexpr int polarity() const { return (v > 0) - (v < 0); }
+
+  friend std::ostream &operator<<(std::ostream &os, const literal &lit) {
+    os << lit.v;
+    return os;
+  }
 };
 
 struct sat {
@@ -33,9 +39,8 @@ struct sat {
 
   // Functions
   sat(std::vector<std::vector<literal>> &formula);
-  bool is_valid();
-  std::optional<std::pair<unsigned int, int>> decide();
-  bool bcp(const std::pair<unsigned int, int> &var);
-  std::optional<std::pair<unsigned int, int>> resolve_conflict();
+  bool decide();
+  bool bcp();
+  bool resolve_conflict();
   bool dpll();
 };
