@@ -140,8 +140,7 @@ bool sat::resolve_conflict() {
     q.pop();
 
     if (already_seen.find(variable) == already_seen.end()) {
-      if (implication_graph[variable].empty() ||
-          assignment_level[variable] < decision_stack.size()) {
+      if (implication_graph[variable].empty()) {
         bt_level = std::max(bt_level, assignment_level[variable]);
         new_clause.push_back(literal(variable * -model[variable]));
       }
