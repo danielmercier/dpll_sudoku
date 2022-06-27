@@ -140,6 +140,7 @@ bool sat::resolve_conflict() {
     q.pop();
 
     if (already_seen.find(variable) == already_seen.end()) {
+      // Register only if we did not seen this variable yet
       if (implication_graph[variable].empty()) {
         bt_level = std::max(bt_level, assignment_level[variable]);
         new_clause.push_back(literal(variable * -model[variable]));
