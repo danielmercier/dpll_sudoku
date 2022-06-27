@@ -61,6 +61,7 @@ std::optional<std::pair<unsigned int, int>> sat::decide() {
         int polarity = literal.polarity();
         model[variable] = polarity;
         decision_stack.push_back(variable);
+        assignment_level[variable] = decision_stack.size();
 
         return std::pair(variable, polarity);
       } else if (model[variable] * literal > 0) {
@@ -165,9 +166,10 @@ std::optional<std::pair<unsigned int, int>> sat::resolve_conflict() {
 
   formula.push_back(new_clause);
 
-  // decision_stack.resize(bt_level + 1);
+  decision_stack.resize(bt_level);
 
   unsigned int variable = decision_stack.back();
+  int polarity = model[variable];
   unsigned int decision_level = decision_stack.size();
   decision_stack.pop_back();
 
@@ -184,9 +186,7 @@ std::optional<std::pair<unsigned int, int>> sat::resolve_conflict() {
   }
 
   // Flip the polarity and add the decision level
-  int polarity = -1 * model[variable];
-
-  model[variable] = polarity;
+  model[variable] = -1 * polarity;
   assignment_level[variable] = decision_stack.size();
   implication_graph[variable].push_back(decision_stack.back());
 
