@@ -140,14 +140,15 @@ bool sat::resolve_conflict() {
     q.pop();
 
     if (already_seen.find(variable) == already_seen.end()) {
-      // Register only if we did not seen this variable yet
-      if (implication_graph[variable].empty()) {
+      if (implication_graph[variable].empty() ||
+          assignment_level[variable] < decision_stack.size()) {
+        // Rel_Sat partitionning
         bt_level = std::max(bt_level, assignment_level[variable]);
         new_clause.push_back(literal(variable * -model[variable]));
-      }
-
-      for (const auto &pred : implication_graph[variable]) {
-        q.push(pred);
+      } else {
+        for (const auto &pred : implication_graph[variable]) {
+          q.push(pred);
+        }
       }
 
       already_seen.insert(variable);
@@ -178,7 +179,6 @@ bool sat::resolve_conflict() {
   // Flip the polarity and add the decision level
   model[variable] = -1 * polarity;
   assignment_level[variable] = decision_stack.size();
-  implication_graph[variable].push_back(decision_stack.back());
 
   return true;
 }
