@@ -36,6 +36,9 @@ sat::sat(std::vector<std::vector<literal>> &formula) {
       var_occurences[literal.variable()][clause] = literal.polarity();
     }
   }
+
+  // Do one BCP in case there are some unit clauses
+  bcp();
 }
 
 bool sat::decide() {
@@ -120,11 +123,7 @@ bool sat::bcp() {
   return true;
 }
 
-bool sat::resolve_conflict() {
-  if (decision_stack.empty()) {
-    return false;
-  }
-
+void sat::rel_sat() {
   std::unordered_set<unsigned int> already_seen;
   std::vector<literal> new_clause;
 
@@ -142,10 +141,9 @@ bool sat::resolve_conflict() {
     if (already_seen.find(variable) == already_seen.end()) {
       if (implication_graph[variable].empty() ||
           assignment_level[variable] < decision_stack.size()) {
-        // Rel_Sat partitionning
         bt_level = std::max(bt_level, assignment_level[variable]);
         new_clause.push_back(literal(variable * -model[variable]));
-      } else {
+      } else if (assignment_level[variable] == decision_stack.size()) {
         for (const auto &pred : implication_graph[variable]) {
           q.push(pred);
         }
@@ -156,8 +154,62 @@ bool sat::resolve_conflict() {
   }
 
   formula.push_back(new_clause);
-
   decision_stack.resize(bt_level);
+}
+
+void sat::first_uip() {
+  std::unordered_set<unsigned int> already_seen;
+  std::vector<literal> new_clause;
+
+  unsigned int bt_level = 0;
+  std::unordered_set<unsigned int> current_level;
+  std::queue<unsigned int> q;
+
+  for (const auto &pred : implication_graph[0]) {
+    if (assignment_level[pred] == decision_stack.size()) {
+      current_level.insert(pred);
+    }
+
+    q.push(pred);
+  }
+
+  while (!q.empty()) {
+    unsigned int variable = q.front();
+    q.pop();
+
+    if (already_seen.find(variable) == already_seen.end()) {
+      if (implication_graph[variable].empty() ||
+          assignment_level[variable] < decision_stack.size() ||
+          current_level.size() <= 1) {
+        bt_level = std::max(bt_level, assignment_level[variable]);
+        new_clause.push_back(literal(variable * -model[variable]));
+      } else if (assignment_level[variable] == decision_stack.size()) {
+        current_level.erase(variable);
+
+        for (const auto &pred : implication_graph[variable]) {
+          if (assignment_level[pred] == decision_stack.size()) {
+            current_level.insert(pred);
+          }
+
+          q.push(pred);
+        }
+      }
+
+      already_seen.insert(variable);
+    }
+  }
+
+  formula.push_back(new_clause);
+  decision_stack.resize(bt_level);
+}
+
+bool sat::resolve_conflict() {
+  if (decision_stack.empty()) {
+    return false;
+  }
+
+  rel_sat();
+  first_uip();
 
   unsigned int variable = decision_stack.back();
   int polarity = model[variable];

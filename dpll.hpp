@@ -41,6 +41,8 @@ struct sat {
   sat(std::vector<std::vector<literal>> &formula);
   bool decide();
   bool bcp();
+  void first_uip();
+  void rel_sat();
   bool resolve_conflict();
   bool dpll();
 };
